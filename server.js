@@ -45,7 +45,7 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // Helper function to call Gemini API (Yeh function API call ko aasan banata hai)
-async function callGemini(prompt, modelName = "gemini-1.5-flash-latest") { // Using gemini-1.5-flash-latest
+async function callGemini(prompt, modelName = "gemini-2.0-flash") { // UPDATED to use gemini-2.0-flash
     try {
         const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
@@ -126,4 +126,3 @@ app.listen(port, () => {
     console.log("Sunishchit karein ki aapki .env file mein GEMINI_API_KEY hai.");
 });
 
-         
