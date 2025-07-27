@@ -2,9 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const puppeteer = require('puppeteer');
+const chromium = require('chrome-aws-lambda');
+const puppeteer = require('puppeteer-core');
 const { OpenAI } = require('openai');
 
 const app = express();
@@ -13,24 +12,19 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ENV Keys
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// Gemini API URL
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// OpenRouter Client
 const openai = new OpenAI({
   apiKey: OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
 });
 
-// ✨ Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
   const fullPrompt = `${context}\n\n${prompt}`.trim();
 
-  // Try OpenRouter First
   try {
     const completion = await openai.chat.completions.create({
       model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
@@ -50,7 +44,6 @@ async function generateAIResponse(prompt, context) {
     console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
   }
 
-  // Fallback to Gemini
   try {
     const response = await axios.post(GEMINI_API_URL, {
       contents: [{
@@ -136,14 +129,13 @@ Guidelines:
   }
 });
 
-// 🧠 Short Answer Endpoint
+// ✏️ Short Answer
 app.post('/generate-short-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
     const context = `Provide a concise 2-3 sentence answer to the question. Be accurate and avoid unnecessary details.`;
-
     const result = await generateAIResponse(prompt, context);
     res.json(result);
   } catch (error) {
@@ -151,7 +143,7 @@ app.post('/generate-short-answer', async (req, res) => {
   }
 });
 
-// 📚 Long Answer Endpoint
+// 📚 Long Answer
 app.post('/generate-long-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -170,7 +162,7 @@ app.post('/generate-long-answer', async (req, res) => {
   }
 });
 
-// 🧾 PDF Download with Watermark
+// 🧾 PDF Generator (with watermark)
 app.post('/download-pdf', async (req, res) => {
   try {
     const { content, filename = 'assignment' } = req.body;
@@ -180,15 +172,10 @@ app.post('/download-pdf', async (req, res) => {
       <html>
         <head>
           <style>
-            @page {
-              margin: 40px;
-            }
+            @page { margin: 40px; }
             body {
-              font-family: 'Arial';
-              padding: 30px;
-              color: #333;
-              line-height: 1.6;
-              position: relative;
+              font-family: 'Arial'; padding: 30px; color: #333;
+              line-height: 1.6; position: relative;
             }
             .watermark {
               position: fixed;
@@ -216,7 +203,13 @@ app.post('/download-pdf', async (req, res) => {
       </html>
     `;
 
-    const browser = await puppeteer.launch({ headless: 'new' });
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless,
+    });
+
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
@@ -236,7 +229,7 @@ app.post('/download-pdf', async (req, res) => {
   }
 });
 
-// 🔍 Health Check
+// 🔍 Health
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
 });
