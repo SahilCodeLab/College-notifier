@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { OpenAI } = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,22 +11,48 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Validate API Key
+// ENV Keys
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-  console.error('❌ Error: Missing GEMINI_API_KEY in .env file');
-  process.exit(1);
-}
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// Gemini 2.0 Flash API Config
+// Gemini API URL
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// Enhanced AI Response Generator
+// OpenRouter Client
+const openai = new OpenAI({
+  apiKey: OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
+});
+
+// ✨ Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
+  const fullPrompt = `${context}\n\n${prompt}`.trim();
+
+  // Try OpenRouter First
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
+      messages: [
+        { role: 'system', content: context },
+        { role: 'user', content: prompt }
+      ],
+      extra_headers: {
+        'HTTP-Referer': 'https://your-frontend.site',
+        'X-Title': 'SahilAssignmentAI'
+      }
+    });
+
+    const result = completion.choices[0].message.content;
+    return { text: result, source: 'openrouter' };
+  } catch (error) {
+    console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
+  }
+
+  // Fallback to Gemini
   try {
     const response = await axios.post(GEMINI_API_URL, {
       contents: [{
-        parts: [{ text: `${context}\n\n${prompt}`.trim() }]
+        parts: [{ text: fullPrompt }]
       }],
       generationConfig: {
         temperature: 0.7,
@@ -39,15 +66,15 @@ async function generateAIResponse(prompt, context) {
       ]
     });
 
-    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || 
-           "Sorry, I couldn't generate a response. Please try again.";
+    const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return { text: result || 'No result from Gemini.', source: 'gemini' };
   } catch (error) {
-    console.error('Gemini API Error:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.error?.message || 'AI service unavailable');
+    console.error('❌ Gemini API Error:', error.message);
+    throw new Error('Both AI services failed.');
   }
 }
 
-// API Endpoints
+// 🚀 Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -99,54 +126,55 @@ Guidelines:
 - Suitable for school/college assignment submission.
 - Maintain clarity, grammar, and formal tone.
 `.trim();
-    
+
     const result = await generateAIResponse(prompt, context);
-    res.json({ text: result });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// 🧠 Short Answer Endpoint
 app.post('/generate-short-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const context = `Provide a concise 2-3 sentence answer to the question. 
-    Be accurate and avoid unnecessary details.`;
-    
+    const context = `Provide a concise 2-3 sentence answer to the question. Be accurate and avoid unnecessary details.`;
+
     const result = await generateAIResponse(prompt, context);
-    res.json({ text: result });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
+// 📚 Long Answer Endpoint
 app.post('/generate-long-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
     const context = `Provide a detailed 300-500 word explanation with:
-    - Clear section headings (##)
-    - Key concepts explained simply
-    - 2-3 relevant examples
-    - Practical applications if applicable`;
-    
+- Clear section headings (##)
+- Key concepts explained simply
+- 2-3 relevant examples
+- Practical applications if applicable`;
+
     const result = await generateAIResponse(prompt, context);
-    res.json({ text: result });
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Health Check
+// 🔍 Health Check
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', gemini: '2.0-flash' });
+  res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
 });
 
-// Start Server
+// 🌐 Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Gemini 2.0 Flash API Ready`);
+  console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
 });
