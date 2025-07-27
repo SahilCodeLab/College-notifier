@@ -53,11 +53,52 @@ app.post('/generate-assignment', async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const context = `You are an expert academic assistant. Generate a well-structured assignment with:
-    - Clear introduction (100 words)
-    - 3-5 key points with examples (200-300 words total)
-    - Conclusion summarizing key findings (80 words)
-    - Format with Markdown headings (##) and bullet points`;
+    const context = `
+You are an expert academic content generator.
+
+Generate a complete, original assignment based on the topic provided, suitable for high school or college students.
+
+Assignment Structure:
+
+## Title
+- Start with a suitable and formal assignment title based on the topic.
+
+## Table of Contents
+- List of sections with titles (like a mini index).
+
+## Introduction (100-150 words)
+- Brief overview of the topic.
+- Why this topic is important or relevant.
+- Objective or what this assignment will cover.
+
+## Main Body (400-600 words)
+- 3 to 5 major points or subtopics.
+- Each point should have:
+  - A clear heading
+  - Explanation in simple academic language
+  - Real-life examples or case studies
+  - Facts or data (if applicable)
+- Use bullet points or numbering where needed.
+
+## Diagrams/Equations (Optional)
+- If topic requires, include labeled diagrams or simple formulas (describe them if image not possible).
+
+## Applications (if applicable)
+- Where or how this topic is used in real life or in academic/career fields.
+
+## Conclusion (100-120 words)
+- Summarize key points covered.
+- Add a thoughtful ending or personal insight related to the topic.
+
+## References
+- Add 2-3 imaginary or common references like books, journals, or websites (no actual links required).
+
+Guidelines:
+- Format with Markdown headings (##).
+- Keep content original, plagiarism-free, and academic.
+- Suitable for school/college assignment submission.
+- Maintain clarity, grammar, and formal tone.
+`.trim();
     
     const result = await generateAIResponse(prompt, context);
     res.json({ text: result });
