@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -10,11 +9,24 @@ const { OpenAI } = require('openai');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
-app.use(express.json());
+// Enhanced middleware configuration
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
+// Environment variables with validation
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+if (!OPENROUTER_API_KEY) {
+  console.error('❌ OPENROUTER_API_KEY is missing in environment variables');
+  process.exit(1);
+}
 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -23,9 +35,11 @@ const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
 });
 
-async function generateAIResponse(prompt, context) {
+// Enhanced AI response generator with retries
+async function generateAIResponse(prompt, context, retries = 2) {
   const fullPrompt = `${context}\n\n${prompt}`.trim();
 
+  // Try OpenRouter first
   try {
     const completion = await openai.chat.completions.create({
       model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
@@ -33,118 +47,128 @@ async function generateAIResponse(prompt, context) {
         { role: 'system', content: context },
         { role: 'user', content: prompt }
       ],
+      temperature: 0.7,
+      max_tokens: 2000,
       extra_headers: {
-        'HTTP-Referer': 'https://your-frontend.site',
-        'X-Title': 'SahilAssignmentAI'
+        'HTTP-Referer': 'https://academic-ai-assistant.com',
+        'X-Title': 'AcademicAI'
       }
     });
 
-    const result = completion.choices[0].message.content;
-    return { text: result, source: 'openrouter' };
+    const result = completion.choices[0]?.message?.content;
+    if (result) return { text: result, source: 'openrouter' };
   } catch (error) {
-    console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
+    console.warn('⚠️ OpenRouter attempt failed:', error.message);
+    if (retries > 0) {
+      console.log(`Retrying... (${retries} attempts left)`);
+      return generateAIResponse(prompt, context, retries - 1);
+    }
   }
 
-  try {
-    const response = await axios.post(GEMINI_API_URL, {
-      contents: [{
-        parts: [{ text: fullPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-        maxOutputTokens: 2048
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" }
-      ]
-    });
+  // Fallback to Gemini if available
+  if (GEMINI_API_KEY) {
+    try {
+      const response = await axios.post(GEMINI_API_URL, {
+        contents: [{
+          parts: [{ text: fullPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 2048
+        },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" }
+        ]
+      }, { timeout: 15000 });
 
-    const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return { text: result || 'No result from Gemini.', source: 'gemini' };
-  } catch (error) {
-    console.error('❌ Gemini API Error:', error.message);
-    throw new Error('Both AI services failed.');
+      const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      return { text: result || 'No result from Gemini.', source: 'gemini' };
+    } catch (error) {
+      console.error('❌ Gemini API Error:', error.message);
+    }
   }
+
+  throw new Error('All AI services failed. Please try again later.');
 }
 
-// 🚀 Assignment Endpoint
+// Cache setup for frequent requests
+const cache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// 🚀 Assignment Endpoint with caching
 app.post('/generate-assignment', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
+    const cacheKey = `assignment:${prompt}`;
+    if (cache.has(cacheKey)) {
+      const cached = cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < CACHE_DURATION) {
+        return res.json(cached.data);
+      }
+    }
+
     const context = `
-You are an expert academic content generator.
+You are an expert academic content generator. Follow these guidelines:
 
-Generate a complete, original assignment based on the topic provided, suitable for high school or college students.
+## Assignment Structure
+1. Title: Formal and topic-specific
+2. Table of Contents: List all sections
+3. Introduction (100-150 words)
+4. Main Body (400-600 words with 3-5 points)
+5. Diagrams/Equations (if applicable)
+6. Applications (real-world uses)
+7. Conclusion (100-120 words)
+8. References (2-3 credible sources)
 
-Assignment Structure:
-
-## Title
-- Start with a suitable and formal assignment title based on the topic.
-
-## Table of Contents
-- List of sections with titles (like a mini index).
-
-## Introduction (100-150 words)
-- Brief overview of the topic.
-- Why this topic is important or relevant.
-- Objective or what this assignment will cover.
-
-## Main Body (400-600 words)
-- 3 to 5 major points or subtopics.
-- Each point should have:
-  - A clear heading
-  - Explanation in simple academic language
-  - Real-life examples or case studies
-  - Facts or data (if applicable)
-- Use bullet points or numbering where needed.
-
-## Diagrams/Equations (Optional)
-- If topic requires, include labeled diagrams or simple formulas (describe them if image not possible).
-
-## Applications (if applicable)
-- Where or how this topic is used in real life or in academic/career fields.
-
-## Conclusion (100-120 words)
-- Summarize key points covered.
-- Add a thoughtful ending or personal insight related to the topic.
-
-## References
-- Add 2-3 imaginary or common references like books, journals, or websites (no actual links required).
-
-Guidelines:
-- Format with Markdown headings (##).
-- Keep content original, plagiarism-free, and academic.
-- Suitable for school/college assignment submission.
-- Maintain clarity, grammar, and formal tone.
+## Formatting Rules
+- Use Markdown headings (##, ###)
+- Include bullet points for lists
+- Bold important terms
+- Add examples for each concept
+- Maintain academic tone
 `.trim();
 
     const result = await generateAIResponse(prompt, context);
+    
+    // Cache the result
+    cache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Assignment Error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      suggestion: 'Please try a different prompt or try again later'
+    });
   }
 });
 
-// ✏️ Short Answer
+// ✏️ Short Answer Endpoint
 app.post('/generate-short-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const context = `Provide a concise 2-3 sentence answer to the question. Be accurate and avoid unnecessary details.`;
+    const context = `Provide a concise 2-3 sentence answer to the question. Be accurate, specific, and avoid fluff.`;
     const result = await generateAIResponse(prompt, context);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Short answer generation failed'
+    });
   }
 });
 
-// 📚 Long Answer
+// 📚 Long Answer Endpoint
 app.post('/generate-long-answer', async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -154,89 +178,163 @@ app.post('/generate-long-answer', async (req, res) => {
 - Clear section headings (##)
 - Key concepts explained simply
 - 2-3 relevant examples
-- Practical applications if applicable`;
-
+- Practical applications
+- Concise conclusion`;
+    
     const result = await generateAIResponse(prompt, context);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      details: 'Long answer generation failed'
+    });
   }
 });
 
-// 🧾 PDF Generator with Watermark
+// 🧾 Robust PDF Generator with Watermark
 app.post('/download-pdf', async (req, res) => {
+  let browser;
   try {
-    const { content, filename = 'assignment' } = req.body;
+    const { content, filename = 'document' } = req.body;
     if (!content) return res.status(400).json({ error: "Content is required" });
 
+    // Enhanced HTML template with responsive design
     const htmlContent = `
+      <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="UTF-8">
           <style>
-            @page { margin: 40px; }
+            @page { margin: 1.5cm; }
             body {
-              font-family: 'Arial'; padding: 30px; color: #333;
-              line-height: 1.6; position: relative;
+              font-family: 'Arial', sans-serif;
+              line-height: 1.6;
+              color: #333;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
             }
             .watermark {
               position: fixed;
-              top: 40%;
-              left: 30%;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(-30deg);
               opacity: 0.1;
-              font-size: 40px;
-              transform: rotate(-30deg);
-              z-index: 0;
-              pointer-events: none;
+              font-size: 72px;
               color: #000;
+              z-index: -1;
+              white-space: nowrap;
+              pointer-events: none;
             }
-            .content {
-              z-index: 1;
-              position: relative;
-            }
+            h1 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+            h2 { color: #34495e; margin-top: 25px; }
+            p { margin-bottom: 15px; }
+            ul, ol { margin-bottom: 20px; padding-left: 20px; }
+            strong { color: #2c3e50; }
           </style>
         </head>
         <body>
-          <div class="watermark">Generated by SahilCodeLab</div>
-          <div class="content">
-            ${content.replace(/\n/g, "<br>")}
-          </div>
+          <div class="watermark">Academic AI</div>
+          <div>${content.replace(/\n/g, "<br>")}</div>
         </body>
       </html>
     `;
 
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath || '/usr/bin/google-chrome',
-      headless: chromium.headless,
+    // More reliable browser launch
+    browser = await puppeteer.launch({
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ],
+      executablePath: process.env.CHROME_PATH || await chromium.executablePath,
+      headless: "new",
+      ignoreHTTPSErrors: true
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, {
+      waitUntil: ['domcontentloaded', 'networkidle0'],
+      timeout: 30000
+    });
 
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-    await browser.close();
+    // PDF generation with better settings
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '1.5cm',
+        right: '1.5cm',
+        bottom: '1.5cm',
+        left: '1.5cm'
+      },
+      timeout: 30000
+    });
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename=${filename}.pdf`,
+      'Content-Disposition': `attachment; filename=${filename.replace(/[^a-z0-9]/gi, '_')}.pdf`,
       'Content-Length': pdfBuffer.length
     });
 
     res.send(pdfBuffer);
+
   } catch (error) {
-    console.error("❌ PDF Generation Error:", error.message);
-    res.status(500).json({ error: 'Failed to generate PDF.' });
+    console.error('PDF Generation Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate PDF',
+      details: NODE_ENV === 'development' ? error.message : undefined,
+      solution: 'Try reducing the content length or try again later'
+    });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 
-// 🔍 Health Check
+// 🩹 Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
+  res.status(200).json({
+    status: 'healthy',
+    services: {
+      openrouter: OPENROUTER_API_KEY ? 'configured' : 'missing',
+      gemini: GEMINI_API_KEY ? 'configured' : 'missing',
+      pdf: 'available'
+    },
+    memory: process.memoryUsage(),
+    uptime: process.uptime()
+  });
 });
 
-// 🌐 Start Server
-app.listen(PORT, () => {
+// 🛑 Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error('🚨 Server Error:', err);
+  res.status(500).json({
+    error: 'Internal server error',
+    requestId: req.id,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 🌐 Start Server with Graceful Shutdown
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
+  console.log(`🔌 AI Providers: ${OPENROUTER_API_KEY ? 'OpenRouter' : ''} ${GEMINI_API_KEY ? '+ Gemini' : ''}`);
+});
+
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('💤 Server terminated');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('💤 Server terminated');
+    process.exit(0);
+  });
 });
