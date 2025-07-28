@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: academic-ai-backend
+    env: node
+    buildCommand: npm install && npm install chrome-aws-lambda puppeteer-core
+    startCommand: node server.js
+    envVars:
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "true"
