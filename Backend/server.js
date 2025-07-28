@@ -203,7 +203,7 @@ app.post('/download-pdf', async (req, res) => {
       </html>
     `;
 
-    const browser = await puppeteer.launch({
+    const executablePath = await chromium.executablePath || '/usr/bin/google-chrome';  const browser = await puppeteer.launch({   args: chromium.args,   defaultViewport: chromium.defaultViewport,   executablePath,   headless: chromium.headless, });
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath,
