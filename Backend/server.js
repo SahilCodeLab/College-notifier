@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -162,7 +163,7 @@ app.post('/generate-long-answer', async (req, res) => {
   }
 });
 
-// 🧾 PDF Generator (with watermark)
+// 🧾 PDF Generator with Watermark
 app.post('/download-pdf', async (req, res) => {
   try {
     const { content, filename = 'assignment' } = req.body;
@@ -203,10 +204,10 @@ app.post('/download-pdf', async (req, res) => {
       </html>
     `;
 
-    const executablePath = await chromium.executablePath || '/usr/bin/google-chrome';  const browser = await puppeteer.launch({   args: chromium.args,   defaultViewport: chromium.defaultViewport,   executablePath,   headless: chromium.headless, });
+    const browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
+      executablePath: await chromium.executablePath || '/usr/bin/google-chrome',
       headless: chromium.headless,
     });
 
@@ -229,7 +230,7 @@ app.post('/download-pdf', async (req, res) => {
   }
 });
 
-// 🔍 Health
+// 🔍 Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
 });
