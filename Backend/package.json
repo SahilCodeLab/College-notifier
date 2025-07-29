@@ -1,23 +1,33 @@
 {
-  "name": "ai-assignment-backend",
-  "version": "1.0.0",
-  "description": "A backend server to generate assignments using OpenRouter and Gemini, and create PDFs.",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "author": "Sahil",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.7.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "openai": "^4.52.2",
-    "pdfkit": "^0.15.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.4"
-  }
+  "name": "ai-assignment-backend",
+  "version": "1.0.0",
+  "description": "A backend server to generate assignments using OpenRouter and Gemini, with dynamic prompts and PDF export.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "Sahil",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.52.2",
+    "pdfkit": "^0.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "keywords": [
+    "AI",
+    "Assignment",
+    "PDF",
+    "OpenRouter",
+    "Gemini",
+    "Node.js",
+    "Express",
+    "Academic"
+  ]
 }
