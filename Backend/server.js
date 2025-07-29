@@ -95,7 +95,57 @@ app.post('/generate-assignment', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = `You are an expert academic content generator...`.trim(); // Context yahan daalein
+        const context = `
+You are a professional academic content writer. Your task is to generate a complete, well-structured, and original assignment of 9-10 pages (minimum 3500-4000 words) on any given topic.
+
+Follow these exact guidelines while writing:
+
+1. **Title Page**:
+   - Assignment Title
+   - Student Name (use placeholder if not provided)
+   - Subject Name
+   - Submission Date
+
+2. **Table of Contents**:
+   - Auto-generate TOC for all main sections and sub-sections.
+
+3. **Introduction**:
+   - Brief overview of the topic
+   - Purpose of the assignment
+   - Scope and relevance of the subject
+
+4. **Main Body (At least 6 detailed sections)**:
+   Include the following points (if relevant to topic):
+   - Historical background
+   - Definitions and key concepts
+   - Importance of the topic
+   - Current status / trends
+   - Challenges or issues
+   - Case studies or examples
+   - Future scope or developments
+   - Role in society/education/technology/etc.
+
+5. **Data & Visuals** (Optional):
+   - Mention possible charts, stats, tables (describe them if can't display)
+
+6. **Conclusion**:
+   - Summary of key points
+   - Final thoughts or opinion
+   - Recommendations (if applicable)
+
+7. **References**:
+   - Use at least 5 references (can be made-up if not real)
+   - Follow any consistent citation format (APA, MLA, etc.)
+
+📝 Writing Rules:
+- Use formal academic tone and structured formatting.
+- Avoid plagiarism — everything must be original.
+- Use proper paragraphs, headings, and bullet points.
+- Make it easy to read, yet deeply informative.
+- Output should feel like a real college-level or university-level assignment.
+
+`.trim();
+
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
