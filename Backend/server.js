@@ -16,9 +16,10 @@ app.use(express.json());
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// Gemini API URL - YAHAN GALTI THEEK KI GAYI HAI
+// ✅ Gemini API URL - Fixed
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-// OpenRouter Client
+
+// ✅ OpenRouter Client
 const openai = new OpenAI({
     apiKey: OPENROUTER_API_KEY,
     baseURL: 'https://openrouter.ai/api/v1',
@@ -26,7 +27,7 @@ const openai = new OpenAI({
 
 // ✨ Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
-    const fullPrompt = ${context}\n\n${prompt}.trim();
+    const fullPrompt = `${context}\n\n${prompt}`.trim(); // ✅ Fixed
 
     // Try OpenRouter First
     try {
@@ -37,7 +38,7 @@ async function generateAIResponse(prompt, context) {
                 { role: 'user', content: prompt }
             ],
             extra_headers: {
-                'HTTP-Referer': 'https://your-frontend.site', // <-- Ise apne site URL se badal lein
+                'HTTP-Referer': 'https://your-frontend.site', // Replace with your actual site URL
                 'X-Title': 'SahilAssignmentAI'
             }
         });
@@ -146,8 +147,7 @@ You are a professional academic writer.
 - Use Markdown with headers (##, ###)
 - Avoid using bold/italic inside text unless needed
 - Use bullet points, numbered lists where appropriate
-.trim();
-
+`.trim(); // ✅ Fixed
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
@@ -164,7 +164,7 @@ app.post('/generate-short-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = Provide a concise 2-3 sentence answer to the question...;
+        const context = "Provide a concise 2-3 sentence answer to the question..."; // ✅ Fixed quotes
 
         const result = await generateAIResponse(prompt, context);
         res.json(result);
@@ -180,7 +180,7 @@ app.post('/generate-long-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = Provide a detailed 300-500 word explanation...;
+        const context = "Provide a detailed 300-500 word explanation..."; // ✅ Fixed quotes
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
@@ -198,6 +198,6 @@ app.get('/health', (req, res) => {
 
 // 🌐 Start Server
 app.listen(PORT, () => {
-    console.log(🚀 Server running on http://localhost:${PORT});
-    console.log(🔌 Fallback AI ready: OpenRouter > Gemini`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
 });
