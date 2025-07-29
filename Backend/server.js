@@ -96,7 +96,7 @@ app.post('/generate-assignment', async (req, res) => {
                 return res.status(400).json({ error: "Either provide a prompt or both subject and topic." });
             }
 
-            prompt = `
+          const prompt = `
 Write a comprehensive college-level assignment on "${topic}" for ${subject} that demonstrates deep subject understanding.
 
 **Required Structure:**
