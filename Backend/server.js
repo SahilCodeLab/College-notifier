@@ -97,18 +97,44 @@ app.post('/generate-assignment', async (req, res) => {
             }
 
             prompt = `
-            Write a high-quality college-level assignment on the topic "${topic}" for the subject "${subject}".
-            Include an engaging introduction, detailed explanation with key points, real-life examples (if applicable),
-            and a strong conclusion. The content should be plagiarism-free, well-structured, and 800-1000 words long.
-            Use a formal tone and add references if needed.
-            `.trim();
-        }
+Write a comprehensive college-level assignment on "${topic}" for ${subject} that demonstrates deep subject understanding.
 
-        const context = `
-            You are an expert academic writer and assignment generator.
-            Based on the user's subject and topic, generate rich, well-researched assignments for college students.
-            Focus on clarity, structure, and academic value.
-        `.trim();
+**Required Structure:**
+1. Introduction (150-200 words):
+   - Engaging opening statement
+   - Clear thesis/purpose
+   - Relevance to subject field
+
+2. Main Body (600-700 words):
+   - 3-4 well-organized sections with subheadings
+   - Theoretical foundations (for humanities) OR methodology (for sciences)
+   - Current research/trends
+   - Real-world applications/examples
+   - Critical analysis (for PG level)
+
+3. Conclusion (150-200 words):
+   - Summary of key points
+   - Implications/future directions
+   - Final thought-provoking statement
+
+**Quality Requirements:**
+- Strictly 800-1000 words
+- Formal academic tone (avoid colloquialisms)
+- Minimum 5 credible references (APA format)
+- Plagiarism-free original content
+- ${subject.includes('Science') ? 'Include diagrams/data where relevant' : ''}
+- ${subject.includes('Arts') ? 'Incorporate theoretical frameworks' : ''}
+`.trim();
+
+const context = `
+You are a ${subject} professor with 15+ years experience creating exemplary assignments. Generate content that:
+
+1. Shows depth of subject knowledge
+2. Balances theory and practical insights
+3. Uses discipline-appropriate terminology
+4. Maintains perfect academic integrity
+5. Adapts complexity for ${level} students
+`.trim();
 
         const result = await generateAIResponse(prompt, context);
 
