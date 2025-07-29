@@ -85,108 +85,117 @@ function generatePDF(content, res, filename = 'output.pdf') {
     doc.end();
 }
 
-// 🚀 Assignment Endpoint
+// 🚀 Assignment Endpoint (8–10 pages)
 app.post('/generate-assignment', async (req, res) => {
-    try {
-        let { subject, topic, prompt } = req.body;
+    try {
+        let { subject, topic, prompt, level } = req.body;
 
-        // If no prompt, generate one based on subject + topic
-        if (!prompt) {
-            if (!subject || !topic) {
-                return res.status(400).json({ error: "Either provide a prompt or both subject and topic." });
-            }
+        if (!prompt) {
+            if (!subject || !topic || !level) {
+                return res.status(400).json({ error: "Provide prompt or subject, topic, and level." });
+            }
 
-          const prompt = `
-Write a comprehensive college-level assignment on "${topic}" for ${subject} that demonstrates deep subject understanding.
+            prompt = `
+Write a comprehensive, plagiarism-free, college-level academic assignment on the topic:  
+🔹 "${topic}"  
+Subject: ${subject}  
+Level: ${level}
 
-**Required Structure:**
-1. Introduction (150-200 words):
-   - Engaging opening statement
-   - Clear thesis/purpose
-   - Relevance to subject field
+---
 
-2. Main Body (600-700 words):
-   - 3-4 well-organized sections with subheadings
-   - Theoretical foundations (for humanities) OR methodology (for sciences)
-   - Current research/trends
-   - Real-world applications/examples
-   - Critical analysis (for PG level)
+📚 Assignment Structure (2500–3000 words / 8–10 pages):
 
-3. Conclusion (150-200 words):
-   - Summary of key points
-   - Implications/future directions
-   - Final thought-provoking statement
+1. Introduction (250–300 words):
+   - Hook statement
+   - Define topic and terms
+   - Thesis and relevance
 
-**Quality Requirements:**
-- Strictly 800-1000 words
-- Formal academic tone (avoid colloquialisms)
-- Minimum 5 credible references (APA format)
-- Plagiarism-free original content
-- ${subject.includes('Science') ? 'Include diagrams/data where relevant' : ''}
-- ${subject.includes('Arts') ? 'Incorporate theoretical frameworks' : ''}
+2. Literature Review (400–500 words):
+   - Past studies
+   - Research gaps
+
+3. Main Body (1600–1800 words):
+   ${subject.includes("Science") ? "- Methodology, data, diagrams\n" : ""}
+   ${subject.includes("Arts") ? "- Theoretical frameworks\n" : ""}
+   ${subject.includes("Commerce") ? "- Market trends, case studies\n" : ""}
+   - Analysis, real-world examples, counterpoints
+
+4. Conclusion (300–400 words):
+   - Summary
+   - Implications
+   - Final thought
+
+5. References (APA format, 8–10 scholarly sources)
+
+- Academic tone
+- 100% original content
+- Structured and readable
 `.trim();
 
-const context = `
-You are a ${subject} professor with 15+ years experience creating exemplary assignments. Generate content that:
-
-1. Shows depth of subject knowledge
-2. Balances theory and practical insights
-3. Uses discipline-appropriate terminology
-4. Maintains perfect academic integrity
-5. Adapts complexity for ${level} students
+            const context = `
+You are a senior professor of ${subject} with 15+ years of experience. Write a detailed, research-based assignment suitable for ${level} students. Ensure:
+- Academic depth
+- Balanced theory + practical
+- Discipline-specific terminology
+- Zero plagiarism
+- APA referencing
 `.trim();
 
-        const result = await generateAIResponse(prompt, context);
+            const result = await generateAIResponse(prompt, context);
+            const filename = `assignment-${subject?.replace(/\s+/g, '')}-${Date.now()}.pdf`;
 
-        // Dynamic PDF filename
-        const filename = `assignment-${subject?.replace(/\s+/g, '') || 'output'}-${Date.now()}.pdf`;
+            if (req.query.download === 'pdf') {
+                return generatePDF(result.text, res, filename);
+            }
 
-        if (req.query.download === 'pdf') {
-            return generatePDF(result.text, res, filename);
-        }
-
-        res.json({ ...result, subject, topic });
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+            res.json({ ...result, subject, topic });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// 📚 Long Answer Endpoint
+// 📚 Long Answer Endpoint (300–500 words)
 app.post('/generate-long-answer', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = `Provide a detailed 300-500 word explanation...`;
+        const context = `
+You are an academic expert. Provide a well-researched, clear, and in-depth long-form answer (300–500 words) to the prompt given.
+- Include explanation, examples, and conclusion
+- Use formal tone and clear structure
+`.trim();
 
-        const result = await generateAIResponse(prompt, context);
-        if (req.query.download === 'pdf') {
-            const filename = `long-answer-${Date.now()}.pdf`;
-            return generatePDF(result.text, res, filename);
-        }
+        const result = await generateAIResponse(prompt, context);
+        const filename = `long-answer-${Date.now()}.pdf`;
 
-        res.json(result);
+        if (req.query.download === 'pdf') {
+            return generatePDF(result.text, res, filename);
+        }
 
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// 🧠 Short Answer Endpoint
+// 🧠 Short Answer Endpoint (2–3 sentences)
 app.post('/generate-short-answer', async (req, res) => {
-    try {
-        const { prompt } = req.body;
-        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = `Provide a concise 2-3 sentence answer to the question...`;
+        const context = `
+Give a brief, 2–3 sentence answer to the prompt using simple, formal academic language.
+Be concise and to the point.
+`.trim();
 
-        const result = await generateAIResponse(prompt, context);
-        res.json(result);
-
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+        const result = await generateAIResponse(prompt, context);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // 🔍 Health Check
