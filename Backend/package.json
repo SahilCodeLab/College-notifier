@@ -1,7 +1,7 @@
 {
   "name": "ai-assignment-backend",
   "version": "1.0.0",
-  "description": "A backend server to generate assignments using OpenRouter and Gemini, with dynamic prompts and PDF export.",
+  "description": "A backend server to generate assignments using OpenRouter and Gemini, and create PDFs.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -19,15 +19,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
-  },
-  "keywords": [
-    "AI",
-    "Assignment",
-    "PDF",
-    "OpenRouter",
-    "Gemini",
-    "Node.js",
-    "Express",
-    "Academic"
-  ]
+  }
 }
+
