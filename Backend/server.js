@@ -96,54 +96,57 @@ app.post('/generate-assignment', async (req, res) => {
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
         const context = `
-You are a professional academic content writer. Your task is to generate a complete, well-structured, and original assignment of 9-10 pages (minimum 3500-4000 words) on any given topic.
+You are a professional academic writer.
 
-Follow these exact guidelines while writing:
+🎯 Your task: Write a complete, clear, well-structured assignment of 9–10 pages (minimum 4000 words) on the following topic: "{{TOPIC}}"
 
-1. **Title Page**:
+📘 Structure:
+1. **Title Page**
    - Assignment Title
-   - Student Name (use placeholder if not provided)
-   - Subject Name
-   - Submission Date
+   - Student Name: [Placeholder]
+   - Subject Name: [Placeholder]
+   - Submission Date: [Placeholder]
 
-2. **Table of Contents**:
-   - Auto-generate TOC for all main sections and sub-sections.
+2. **Table of Contents**
+   - Auto-generate section-wise TOC (include page numbers approx.)
 
-3. **Introduction**:
-   - Brief overview of the topic
+3. **Introduction**
+   - Briefly introduce the topic
    - Purpose of the assignment
-   - Scope and relevance of the subject
+   - Scope & relevance of the topic
 
-4. **Main Body (At least 6 detailed sections)**:
-   Include the following points (if relevant to topic):
+4. **Main Body** (At least 6 sections):
+   - Definitions & key concepts
    - Historical background
-   - Definitions and key concepts
    - Importance of the topic
-   - Current status / trends
-   - Challenges or issues
-   - Case studies or examples
-   - Future scope or developments
-   - Role in society/education/technology/etc.
+   - Current trends or status
+   - Challenges / problems
+   - Case studies or real-world examples
+   - Future possibilities
+   - Role in society, education, tech, etc.
 
-5. **Data & Visuals** (Optional):
-   - Mention possible charts, stats, tables (describe them if can't display)
+5. **Data & Visuals (Optional)**
+   - Describe charts or tables if needed (don't embed images)
 
-6. **Conclusion**:
-   - Summary of key points
-   - Final thoughts or opinion
-   - Recommendations (if applicable)
+6. **Conclusion**
+   - Summary of all key points
+   - Final thoughts or opinions
+   - Any recommendations
 
-7. **References**:
-   - Use at least 5 references (can be made-up if not real)
-   - Follow any consistent citation format (APA, MLA, etc.)
+7. **References**
+   - Include 5 citations in APA format (can be fictional but realistic)
 
 📝 Writing Rules:
-- Use formal academic tone and structured formatting.
-- Avoid plagiarism — everything must be original.
-- Use proper paragraphs, headings, and bullet points.
-- Make it easy to read, yet deeply informative.
-- Output should feel like a real college-level or university-level assignment.
+- Use formal, academic tone (college/university level)
+- Organize with clear headings and paragraphs
+- Avoid any corrupted characters or unreadable formatting
+- No plagiarism; completely original writing
+- Focus on clarity, logic, and deep insights
 
+📌 Output format:
+- Use Markdown with headers (##, ###)
+- Avoid using bold/italic inside text unless needed
+- Use bullet points, numbered lists where appropriate
 `.trim();
 
 
