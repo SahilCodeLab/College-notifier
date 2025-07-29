@@ -10,12 +10,17 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public')); // For serving static files
+// Enable CORS
+app.use(cors({
+    origin: ['http://localhost:5500', 'http://127.0.0.1:5500'], // Adjust for your frontend
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 
-// ENV Keys
+app.use(express.json());
+app.use(express.static('public'));
+
+// API Keys
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -28,11 +33,10 @@ const openai = new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
 });
 
-// ✨ Unified AI Response Generator
+// Generate AI Response
 async function generateAIResponse(prompt, context) {
     const fullPrompt = `${context}\n\n${prompt}`.trim();
 
-    // Try OpenRouter First
     try {
         const completion = await openai.chat.completions.create({
             model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
@@ -41,7 +45,7 @@ async function generateAIResponse(prompt, context) {
                 { role: 'user', content: prompt }
             ],
             extra_headers: {
-                'HTTP-Referer': 'https://your-frontend.site',
+                'HTTP-Referer': 'http://localhost:5500',
                 'X-Title': 'SahilAssignmentAI'
             }
         });
@@ -50,10 +54,9 @@ async function generateAIResponse(prompt, context) {
         return { text: result, source: 'openrouter' };
 
     } catch (error) {
-        console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
+        console.warn('OpenRouter failed. Trying Gemini...', error.message);
     }
 
-    // Fallback to Gemini
     try {
         const response = await axios.post(GEMINI_API_URL, {
             contents: [{ parts: [{ text: fullPrompt }] }],
@@ -73,27 +76,25 @@ async function generateAIResponse(prompt, context) {
         return { text: result || 'No result from Gemini.', source: 'gemini' };
 
     } catch (error) {
-        console.error('❌ Gemini API Error:', error.message);
+        console.error('Gemini API Error:', error.message);
         throw new Error('Both AI services failed.');
     }
 }
 
-// 📄 Premium PDF Generator Function
+// Generate Premium PDF
 function generatePremiumPDF(content, res, userDetails = {}) {
     const doc = new PDFDocument({
         margin: 50,
         size: 'A4',
-        bufferPages: true // Important for page numbers
+        bufferPages: true
     });
 
-    // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=premium_assignment.pdf');
 
-    // Pipe PDF to response
     doc.pipe(res);
 
-    // Custom colors
+    // Colors
     const colors = {
         primary: '#3498db',
         secondary: '#2c3e50',
@@ -102,9 +103,11 @@ function generatePremiumPDF(content, res, userDetails = {}) {
         lightGray: '#f5f5f5'
     };
 
-    // 📌 Watermark and Page Number Setup
+    // Watermark and Page Numbers
     doc.on('pageAdded', () => {
-        // Watermark (on every page)
+        const pageNumber = doc.bufferedPageRange().count;
+        
+        // Watermark
         doc.fillColor('#e0e0e0')
             .fontSize(60)
             .rotate(-45, { origin: [doc.page.width / 2, doc.page.height / 2] })
@@ -116,8 +119,7 @@ function generatePremiumPDF(content, res, userDetails = {}) {
             .rotate(45, { origin: [doc.page.width / 2, doc.page.height / 2] })
             .opacity(1);
 
-        // Page number (footer right)
-        const pageNumber = doc.bufferedPageRange().count;
+        // Page Number
         doc.fillColor(colors.text)
             .fontSize(10)
             .text(`Page ${pageNumber}`, doc.page.width - 50, doc.page.height - 30, {
@@ -125,13 +127,11 @@ function generatePremiumPDF(content, res, userDetails = {}) {
             });
     });
 
-    // Trigger first page
     doc.addPage();
 
-    // 🎨 Cover Page Design
+    // Cover Page
     doc.rect(0, 0, doc.page.width, doc.page.height).fill(colors.lightGray);
     
-    // Title Box
     doc.rect(50, 150, doc.page.width - 100, 120)
         .fill(colors.primary)
         .fillColor('white')
@@ -142,7 +142,6 @@ function generatePremiumPDF(content, res, userDetails = {}) {
             align: 'center'
         });
     
-    // Topic
     doc.fillColor(colors.secondary)
         .fontSize(20)
         .text(content.split('\n')[0].replace('#', '').trim(), 50, 250, {
@@ -150,13 +149,11 @@ function generatePremiumPDF(content, res, userDetails = {}) {
             align: 'center'
         });
     
-    // Decorative line
     doc.moveTo(50, 300)
         .lineTo(doc.page.width - 50, 300)
         .stroke(colors.accent)
         .lineWidth(2);
     
-    // Student details
     doc.fillColor(colors.text)
         .fontSize(14)
         .text(`Prepared by: ${userDetails.name || '[Student Name]'}`, 50, 320, {
@@ -172,7 +169,6 @@ function generatePremiumPDF(content, res, userDetails = {}) {
             align: 'center'
         });
     
-    // Footer note
     doc.fontSize(10)
         .text('Generated by SahilCodeLab', 50, doc.page.height - 50, {
             width: doc.page.width - 100,
@@ -181,7 +177,7 @@ function generatePremiumPDF(content, res, userDetails = {}) {
     
     doc.addPage();
 
-    // 📑 Table of Contents
+    // Table of Contents
     doc.fillColor(colors.secondary)
         .fontSize(18)
         .font('Helvetica-Bold')
@@ -189,7 +185,6 @@ function generatePremiumPDF(content, res, userDetails = {}) {
     
     doc.moveDown();
     
-    // Generate TOC from headings
     const headings = content.split('\n').filter(line => line.startsWith('##'));
     headings.forEach(heading => {
         doc.fillColor(colors.primary)
@@ -210,28 +205,21 @@ function generatePremiumPDF(content, res, userDetails = {}) {
         doc.moveDown(0.5);
     });
 
-    // 📝 Main Content
+    // Main Content
     doc.addPage();
-    let currentSection = '';
     
     content.split('\n').forEach(line => {
-        // Page break if near bottom
-        if (doc.y > doc.page.height - 100) {
-            doc.addPage();
-        }
+        if (doc.y > doc.page.height - 100) doc.addPage();
         
         if (line.startsWith('##')) {
-            // Major section heading
-            currentSection = line.replace('##', '').trim();
             doc.fillColor(colors.secondary)
                 .font('Helvetica-Bold')
                 .fontSize(16)
-                .text(currentSection, {
+                .text(line.replace('##', '').trim(), {
                     align: 'left'
                 });
             doc.moveDown();
         } else if (line.startsWith('###')) {
-            // Subsection heading
             doc.fillColor(colors.primary)
                 .font('Helvetica-Bold')
                 .fontSize(14)
@@ -240,7 +228,6 @@ function generatePremiumPDF(content, res, userDetails = {}) {
                 });
             doc.moveDown();
         } else if (line.trim() !== '') {
-            // Regular content
             doc.fillColor(colors.text)
                 .font('Times-Roman')
                 .fontSize(12)
@@ -254,7 +241,7 @@ function generatePremiumPDF(content, res, userDetails = {}) {
         }
     });
 
-    // 📚 References Page
+    // References
     doc.addPage();
     doc.fillColor(colors.secondary)
         .font('Helvetica-Bold')
@@ -263,7 +250,6 @@ function generatePremiumPDF(content, res, userDetails = {}) {
     
     doc.moveDown();
     
-    // Sample references (in real app, extract from content)
     const references = [
         "Author, A. (Year). Title of work. Publisher.",
         "Researcher, B. (Year). Article title. Journal Name, volume(issue), page range.",
@@ -285,69 +271,31 @@ function generatePremiumPDF(content, res, userDetails = {}) {
     doc.end();
 }
 
-// 🚀 Assignment Endpoint (Two-step process)
+// Generate Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
     try {
         const { prompt, userDetails } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
         const context = `
-You are a professional academic writer.
+You are a professional academic writer. Generate a well-structured assignment with:
+1. Title Page
+2. Table of Contents
+3. Introduction
+4. Main Body (6+ sections)
+5. Conclusion
+6. References (5 APA citations)
 
-🎯 Your task: Write a complete, clear, well-structured assignment of 9–10 pages (minimum 4000 words) on the following topic: "{{TOPIC}}"
-
-📘 Structure:
-1. **Title Page**
-   - Assignment Title
-   - Student Name: [Placeholder]
-   - Subject Name: [Placeholder]
-   - Submission Date: [Placeholder]
-
-2. **Table of Contents**
-   - Auto-generate section-wise TOC (include page numbers approx.)
-
-3. **Introduction**
-   - Briefly introduce the topic
-   - Purpose of the assignment
-   - Scope & relevance of the topic
-
-4. **Main Body** (At least 6 sections):
-   - Definitions & key concepts
-   - Historical background
-   - Importance of the topic
-   - Current trends or status
-   - Challenges / problems
-   - Case studies or real-world examples
-   - Future possibilities
-   - Role in society, education, tech, etc.
-
-5. **Data & Visuals (Optional)**
-   - Describe charts or tables if needed (don't embed images)
-
-6. **Conclusion**
-   - Summary of all key points
-   - Final thoughts or opinions
-   - Any recommendations
-
-7. **References**
-   - Include 5 citations in APA format (can be fictional but realistic)
-
-📝 Writing Rules:
-- Use formal, academic tone (college/university level)
-- Organize with clear headings and paragraphs
-- Avoid any corrupted characters or unreadable formatting
-- No plagiarism; completely original writing
-- Focus on clarity, logic, and deep insights
-
-📌 Output format:
-- Use Markdown with headers (##, ###)
-- Avoid using bold/italic inside text unless needed
-- Use bullet points, numbered lists where appropriate
+Format requirements:
+- Use markdown headers (##, ###)
+- Formal academic tone
+- 4000+ words
+- Original content only
 `.trim();
 
         const result = await generateAIResponse(prompt, context);
         
-        // Save the generated content temporarily (in a real app, use database)
+        // In production, store in database instead
         const contentId = Date.now().toString();
         const tempDir = path.join(__dirname, 'temp');
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -367,7 +315,7 @@ You are a professional academic writer.
     }
 });
 
-// 📥 PDF Download Endpoint
+// Download PDF Endpoint
 app.get('/download-pdf/:contentId', (req, res) => {
     try {
         const contentId = req.params.contentId;
@@ -381,17 +329,19 @@ app.get('/download-pdf/:contentId', (req, res) => {
         const { content, userDetails } = JSON.parse(fs.readFileSync(filePath));
         generatePremiumPDF(content, res, userDetails);
         
-        // Clean up (in production, use proper storage)
+        // Clean up
         fs.unlinkSync(filePath);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Other endpoints remain the same...
+// Health Check
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'healthy' });
+});
 
-// 🌐 Start Server
+// Start Server
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });
