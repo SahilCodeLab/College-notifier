@@ -88,70 +88,69 @@ function generatePDF(content, res) {
         }
     });
 
+    // Setup Response Headers
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=assignment.pdf');
 
+    // Start Streaming to Response
     doc.pipe(res);
 
     let pageNumber = 0;
 
-    // Function to add watermark + footer on every page
+    // Function: Add Watermark & Footer
     const addPageDecorations = () => {
         pageNumber++;
 
-        // Watermark
+        // 💧 Watermark
         doc.save();
         doc.rotate(-45, { origin: [300, 400] });
-        doc.fontSize(50).fillColor('#f0f0f0').opacity(0.2);
+        doc.fontSize(50).fillColor('#eeeeee').opacity(0.2);
         doc.text('SahilCodeLab', 100, 300, {
             align: 'center',
             width: 400
         });
         doc.restore();
-        doc.opacity(1);
+        doc.opacity(1); // Reset opacity
 
-        // Footer - Page number
-        doc.fontSize(10).fillColor('gray');
-        doc.text(`Page ${pageNumber}`, 0, 780, {
-            align: 'center'
+        // 📄 Page Number Footer
+        doc.fontSize(10).fillColor('gray').text(`Page ${pageNumber}`, 50, 780, {
+            align: 'center',
+            width: 500
         });
     };
 
-    // First Page
+    // First page decoration
+    doc.on('pageAdded', addPageDecorations);
     addPageDecorations();
 
-    // Apply watermark on all new pages too
-    doc.on('pageAdded', addPageDecorations);
-
-    // Header Title
+    // ✨ Header
     doc.font('Helvetica-Bold')
         .fontSize(20)
-        .fillColor('#333333')
-        .text('📘 Academic Assignment', {
-            align: 'center',
-            underline: true
-        });
+        .fillColor('#222222')
+        .text('📘 Academic Assignment', { align: 'center', underline: true });
 
     doc.moveDown(1.5);
 
-    // Main content
+    // ✅ Handle Empty Content
+    const safeContent = content && content.length > 0 ? content : 'No content provided...';
+
+    // 📝 Main Text Content
     doc.font('Times-Roman')
         .fontSize(12)
         .fillColor('black')
-        .text(content || 'No content provided.', {
+        .text(safeContent, {
             align: 'justify',
             lineGap: 6
         });
 
-    // Footer credit
     doc.moveDown(2);
+
+    // ✅ Footer Note
     doc.fontSize(10)
         .fillColor('gray')
-        .text('Generated with ❤️ by SahilCodeLab', {
-            align: 'center'
-        });
+        .text('Generated with ❤️ by SahilCodeLab', { align: 'center' });
 
-    doc.end();
+    doc.end(); // ✅ Finalize the PDF
 }
 // 🚀 Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
