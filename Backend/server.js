@@ -27,9 +27,8 @@ const openai = new OpenAI({
 
 // ✨ Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
-    const fullPrompt = `${context}\n\n${prompt}`.trim(); // ✅ Fixed
+    const fullPrompt = `${context}\n\n${prompt}`.trim();
 
-    // Try OpenRouter First
     try {
         const completion = await openai.chat.completions.create({
             model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
@@ -38,7 +37,7 @@ async function generateAIResponse(prompt, context) {
                 { role: 'user', content: prompt }
             ],
             extra_headers: {
-                'HTTP-Referer': 'https://your-frontend.site', // Replace with your actual site URL
+                'HTTP-Referer': 'https://your-frontend.site',
                 'X-Title': 'SahilAssignmentAI'
             }
         });
@@ -50,7 +49,6 @@ async function generateAIResponse(prompt, context) {
         console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
     }
 
-    // Fallback to Gemini
     try {
         const response = await axios.post(GEMINI_API_URL, {
             contents: [{ parts: [{ text: fullPrompt }] }],
@@ -97,57 +95,20 @@ app.post('/generate-assignment', async (req, res) => {
 
         const context = `
 You are a professional academic writer.
-
 🎯 Your task: Write a complete, clear, well-structured assignment of 9–10 pages (minimum 4000 words) on the following topic: "{{TOPIC}}"
 
 📘 Structure:
 1. Title Page
-   - Assignment Title
-   - Student Name: [Placeholder]
-   - Subject Name: [Placeholder]
-   - Submission Date: [Placeholder]
-
 2. Table of Contents
-   - Auto-generate section-wise TOC (include page numbers approx.)
-
 3. Introduction
-   - Briefly introduce the topic
-   - Purpose of the assignment
-   - Scope & relevance of the topic
-
-4. Main Body (At least 6 sections):
-   - Definitions & key concepts
-   - Historical background
-   - Importance of the topic
-   - Current trends or status
-   - Challenges / problems
-   - Case studies or real-world examples
-   - Future possibilities
-   - Role in society, education, tech, etc.
-
+4. Main Body
 5. Data & Visuals (Optional)
-   - Describe charts or tables if needed (don't embed images)
-
 6. Conclusion
-   - Summary of all key points
-   - Final thoughts or opinions
-   - Any recommendations
-
 7. References
-   - Include 5 citations in APA format (can be fictional but realistic)
-
 📝 Writing Rules:
-- Use formal, academic tone (college/university level)
-- Organize with clear headings and paragraphs
-- Avoid any corrupted characters or unreadable formatting
-- No plagiarism; completely original writing
-- Focus on clarity, logic, and deep insights
-
-📌 Output format:
-- Use Markdown with headers (##, ###)
-- Avoid using bold/italic inside text unless needed
-- Use bullet points, numbered lists where appropriate
-`.trim(); // ✅ Fixed
+- Use formal academic tone
+📌 Output format: Markdown with headers (#, ##)
+`.trim();
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
@@ -164,8 +125,7 @@ app.post('/generate-short-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a concise 2-3 sentence answer to the question..."; // ✅ Fixed quotes
-
+        const context = "Provide a concise 2-3 sentence answer to the question...";
         const result = await generateAIResponse(prompt, context);
         res.json(result);
 
@@ -180,14 +140,62 @@ app.post('/generate-long-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a detailed 300-500 word explanation..."; // ✅ Fixed quotes
-
+        const context = "Provide a detailed 300-500 word explanation...";
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
         res.json(result);
 
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// 📦 Bulk Questions PDF Generator
+app.post('/generate-bulk-pdf', async (req, res) => {
+    try {
+        const { questions } = req.body;
+        if (!Array.isArray(questions) || questions.length === 0) {
+            return res.status(400).json({ error: 'Questions array is required.' });
+        }
+
+        const finalAnswers = [];
+
+        for (let i = 0; i < questions.length; i++) {
+            const { question, marks } = questions[i];
+            const context = `Answer the following academic question in a formal tone. It is a ${marks} marks question, so explain accordingly. Use paragraphs or bullet points as needed.`;
+
+            const result = await generateAIResponse(question, context);
+            finalAnswers.push({
+                qNo: i + 1,
+                marks,
+                question,
+                answer: result.text
+            });
+        }
+
+        const doc = new PDFDocument({ margin: 50 });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=bulk_answers.pdf');
+
+        doc.pipe(res);
+        doc.font('Times-Roman').fontSize(16).text('📘 Bulk Question Answers', { align: 'center' });
+        doc.moveDown();
+
+        finalAnswers.forEach(({ qNo, marks, question, answer }) => {
+            doc.fontSize(12).fillColor('black')
+                .text(`\n🔹 Question ${qNo} (${marks} Marks): ${question}`, { underline: true });
+            doc.moveDown(0.5);
+            doc.fontSize(11).fillColor('black').text(answer);
+            doc.moveDown();
+        });
+
+        doc.fontSize(10).fillColor('gray')
+            .text('\nGenerated by SahilCodeLab AI Assistant', { align: 'center' });
+        doc.end();
+
+    } catch (error) {
+        console.error("❌ Bulk PDF Error:", error.message);
+        res.status(500).json({ error: 'Bulk question generation failed.' });
     }
 });
 
