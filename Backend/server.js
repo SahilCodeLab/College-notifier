@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { OpenAI } = require('openai');
-const PDFDocument = require('pdfkit'); // 📄 PDF support
+const PDFDocument = require('pdfkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,20 +16,19 @@ app.use(express.json());
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// ✅ Gemini API URL - Fixed
+// Gemini API URL
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// ✅ OpenRouter Client
+// OpenRouter Client
 const openai = new OpenAI({
     apiKey: OPENROUTER_API_KEY,
     baseURL: 'https://openrouter.ai/api/v1',
 });
 
-// ✨ Unified AI Response Generator
+// Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
-    const fullPrompt = `${context}\n\n${prompt}`.trim(); // ✅ Fixed
+    const fullPrompt = `${context}\n\n${prompt}`.trim();
 
-    // Try OpenRouter First
     try {
         const completion = await openai.chat.completions.create({
             model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
@@ -38,19 +37,15 @@ async function generateAIResponse(prompt, context) {
                 { role: 'user', content: prompt }
             ],
             extra_headers: {
-                'HTTP-Referer': 'https://your-frontend.site', // Replace with your actual site URL
+                'HTTP-Referer': 'https://your-frontend.site',
                 'X-Title': 'SahilAssignmentAI'
             }
         });
-
-        const result = completion.choices[0].message.content;
-        return { text: result, source: 'openrouter' };
-
+        return { text: completion.choices[0].message.content, source: 'openrouter' };
     } catch (error) {
         console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
     }
 
-    // Fallback to Gemini
     try {
         const response = await axios.post(GEMINI_API_URL, {
             contents: [{ parts: [{ text: fullPrompt }] }],
@@ -65,17 +60,15 @@ async function generateAIResponse(prompt, context) {
                 { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" }
             ]
         });
-
         const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         return { text: result || 'No result from Gemini.', source: 'gemini' };
-
     } catch (error) {
         console.error('❌ Gemini API Error:', error.message);
         throw new Error('Both AI services failed.');
     }
 }
 
-// 📄 PDF Generator Function
+// PDF Generator Function
 function generatePDF(content, res) {
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
@@ -89,7 +82,18 @@ function generatePDF(content, res) {
     doc.end();
 }
 
-// 🚀 Assignment Endpoint
+// New PDF Download Endpoint
+app.post('/download-pdf', async (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content) return res.status(400).json({ error: "Content is required" });
+        generatePDF(content, res);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -147,56 +151,49 @@ You are a professional academic writer.
 - Use Markdown with headers (##, ###)
 - Avoid using bold/italic inside text unless needed
 - Use bullet points, numbered lists where appropriate
-`.trim(); // ✅ Fixed
+`.trim();
 
         const result = await generateAIResponse(prompt, context);
-        if (req.query.download === 'pdf') return generatePDF(result.text, res);
-        res.json(result);
-
+        res.json(result); // Return content as JSON
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🧠 Short Answer Endpoint
+// Short Answer Endpoint
 app.post('/generate-short-answer', async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a concise 2-3 sentence answer to the question..."; // ✅ Fixed quotes
-
+        const context = "Provide a concise 2-3 sentence answer to the question...";
         const result = await generateAIResponse(prompt, context);
         res.json(result);
-
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📚 Long Answer Endpoint
+// Long Answer Endpoint
 app.post('/generate-long-answer', async (req, res) => {
     try {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a detailed 300-500 word explanation..."; // ✅ Fixed quotes
-
+        const context = "Provide a detailed 300-500 word explanation...";
         const result = await generateAIResponse(prompt, context);
-        if (req.query.download === 'pdf') return generatePDF(result.text, res);
-        res.json(result);
-
+        res.json(result); // Return content as JSON
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🔍 Health Check
+// Health Check
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
 });
 
-// 🌐 Start Server
+// Start Server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
