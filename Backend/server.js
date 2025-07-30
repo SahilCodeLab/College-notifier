@@ -16,10 +16,10 @@ app.use(express.json());
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// ✅ Gemini API URL - Fixed
+// Gemini API URL - YAHAN GALTI THEEK KI GAYI HAI
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-// ✅ OpenRouter Client
+// OpenRouter Client
 const openai = new OpenAI({
     apiKey: OPENROUTER_API_KEY,
     baseURL: 'https://openrouter.ai/api/v1',
@@ -27,7 +27,7 @@ const openai = new OpenAI({
 
 // ✨ Unified AI Response Generator
 async function generateAIResponse(prompt, context) {
-    const fullPrompt = `${context}\n\n${prompt}`.trim(); // ✅ Fixed
+    const fullPrompt = `${context}\n\n${prompt}`.trim();
 
     // Try OpenRouter First
     try {
@@ -38,7 +38,7 @@ async function generateAIResponse(prompt, context) {
                 { role: 'user', content: prompt }
             ],
             extra_headers: {
-                'HTTP-Referer': 'https://your-frontend.site', // Replace with your actual site URL
+                'HTTP-Referer': 'https://your-frontend.site', // <-- Ise apne site URL se badal lein
                 'X-Title': 'SahilAssignmentAI'
             }
         });
@@ -95,59 +95,7 @@ app.post('/generate-assignment', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = `
-You are a professional academic writer.
-
-🎯 Your task: Write a complete, clear, well-structured assignment of 9–10 pages (minimum 4000 words) on the following topic: "{{TOPIC}}"
-
-📘 Structure:
-1. Title Page
-   - Assignment Title
-   - Student Name: [Placeholder]
-   - Subject Name: [Placeholder]
-   - Submission Date: [Placeholder]
-
-2. Table of Contents
-   - Auto-generate section-wise TOC (include page numbers approx.)
-
-3. Introduction
-   - Briefly introduce the topic
-   - Purpose of the assignment
-   - Scope & relevance of the topic
-
-4. Main Body (At least 6 sections):
-   - Definitions & key concepts
-   - Historical background
-   - Importance of the topic
-   - Current trends or status
-   - Challenges / problems
-   - Case studies or real-world examples
-   - Future possibilities
-   - Role in society, education, tech, etc.
-
-5. Data & Visuals (Optional)
-   - Describe charts or tables if needed (don't embed images)
-
-6. Conclusion
-   - Summary of all key points
-   - Final thoughts or opinions
-   - Any recommendations
-
-7. References
-   - Include 5 citations in APA format (can be fictional but realistic)
-
-📝 Writing Rules:
-- Use formal, academic tone (college/university level)
-- Organize with clear headings and paragraphs
-- Avoid any corrupted characters or unreadable formatting
-- No plagiarism; completely original writing
-- Focus on clarity, logic, and deep insights
-
-📌 Output format:
-- Use Markdown with headers (##, ###)
-- Avoid using bold/italic inside text unless needed
-- Use bullet points, numbered lists where appropriate
-`.trim(); // ✅ Fixed
+        const context = `You are an expert academic content generator...`.trim(); // Context yahan daalein
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
@@ -164,7 +112,7 @@ app.post('/generate-short-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a concise 2-3 sentence answer to the question..."; // ✅ Fixed quotes
+        const context = `Provide a concise 2-3 sentence answer to the question...`;
 
         const result = await generateAIResponse(prompt, context);
         res.json(result);
@@ -180,7 +128,7 @@ app.post('/generate-long-answer', async (req, res) => {
         const { prompt } = req.body;
         if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-        const context = "Provide a detailed 300-500 word explanation..."; // ✅ Fixed quotes
+        const context = `Provide a detailed 300-500 word explanation...`;
 
         const result = await generateAIResponse(prompt, context);
         if (req.query.download === 'pdf') return generatePDF(result.text, res);
