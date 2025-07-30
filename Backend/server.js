@@ -76,7 +76,9 @@ async function generateAIResponse(prompt, context) {
 }
 
 // 📄 PDF Generator Function
+
 function generatePDF(content, res) {
+    const PDFDocument = require('pdfkit');
     const doc = new PDFDocument({
         size: 'A4',
         margins: { top: 70, bottom: 70, left: 50, right: 50 },
@@ -88,41 +90,40 @@ function generatePDF(content, res) {
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=assignment.pdf');
+
     doc.pipe(res);
 
     let pageNumber = 0;
 
-    // 💧 Watermark & Footer on Every Page
-    doc.on('pageAdded', () => {
+    // Function to add watermark + footer on every page
+    const addPageDecorations = () => {
         pageNumber++;
 
-        // 🟦 Watermark (center, rotated)
-        doc.save()
-            .rotate(-45, { origin: [300, 400] })
-            .font('Times-Roman')
-            .fontSize(50)
-            .fillColor('#f0f0f0')
-            .opacity(0.2)
-            .text('SahilCodeLab', 100, 300, {
-                align: 'center',
-                width: 400
-            })
-            .opacity(1)
-            .restore();
+        // Watermark
+        doc.save();
+        doc.rotate(-45, { origin: [300, 400] });
+        doc.fontSize(50).fillColor('#f0f0f0').opacity(0.2);
+        doc.text('SahilCodeLab', 100, 300, {
+            align: 'center',
+            width: 400
+        });
+        doc.restore();
+        doc.opacity(1);
 
-        // 📄 Footer Page Number
-        doc.fontSize(10)
-            .fillColor('gray')
-            .text(`Page ${pageNumber}`, 50, 780, {
-                width: 500,
-                align: 'center'
-            });
-    });
+        // Footer - Page number
+        doc.fontSize(10).fillColor('gray');
+        doc.text(`Page ${pageNumber}`, 0, 780, {
+            align: 'center'
+        });
+    };
 
-    // First page event trigger
-    doc.emit('pageAdded');
+    // First Page
+    addPageDecorations();
 
-    // 🧑‍🎓 Header
+    // Apply watermark on all new pages too
+    doc.on('pageAdded', addPageDecorations);
+
+    // Header Title
     doc.font('Helvetica-Bold')
         .fontSize(20)
         .fillColor('#333333')
@@ -131,18 +132,18 @@ function generatePDF(content, res) {
             underline: true
         });
 
-    doc.moveDown(1);
+    doc.moveDown(1.5);
 
-    // 📝 Main content
+    // Main content
     doc.font('Times-Roman')
         .fontSize(12)
         .fillColor('black')
-        .text(content, {
+        .text(content || 'No content provided.', {
             align: 'justify',
             lineGap: 6
         });
 
-    // 👣 Footer Credit
+    // Footer credit
     doc.moveDown(2);
     doc.fontSize(10)
         .fillColor('gray')
