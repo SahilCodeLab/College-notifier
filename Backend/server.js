@@ -78,79 +78,72 @@ async function generateAIResponse(prompt, context) {
 // 📄 PDF Generator Function
 
 function generatePDF(content, res) {
-    const PDFDocument = require('pdfkit');
-    const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 70, bottom: 70, left: 50, right: 50 },
-        info: {
-            Title: 'Assignment',
-            Author: 'SahilCodeLab',
+    try {
+        const doc = new PDFDocument({
+            size: 'A4',
+            margins: { top: 70, bottom: 70, left: 50, right: 50 },
+            info: {
+                Title: 'Assignment',
+                Author: 'SahilCodeLab',
+            }
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=assignment.pdf');
+        doc.pipe(res);
+
+        let pageNumber = 0;
+        const addPageDecorations = () => {
+            pageNumber++;
+            doc.save();
+            doc.rotate(-45, { origin: [300, 400] });
+            doc.fontSize(50).fillColor('#eeeeee').opacity(0.2);
+            doc.text('SahilCodeLab', 100, 300, {
+                align: 'center',
+                width: 400
+            });
+            doc.restore();
+            doc.opacity(1);
+            doc.fontSize(10).fillColor('gray').text(`Page ${pageNumber}`, 50, 780, {
+                align: 'center',
+                width: 500
+            });
+        };
+
+        doc.on('pageAdded', addPageDecorations);
+        addPageDecorations();
+
+        doc.font('Helvetica-Bold')
+            .fontSize(20)
+            .fillColor('#222222')
+            .text('📘 Academic Assignment', { align: 'center', underline: true });
+
+        doc.moveDown(1.5);
+
+        const safeContent = content && content.length > 0 ? content : 'No content provided...';
+        const paragraphs = safeContent.split('\n\n');
+
+        for (let para of paragraphs) {
+            doc.font('Times-Roman')
+                .fontSize(12)
+                .fillColor('black')
+                .text(para.trim(), {
+                    align: 'justify',
+                    lineGap: 6
+                });
+            doc.moveDown();
         }
-    });
 
-    // Setup Response Headers
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=assignment.pdf');
+        doc.moveDown(2);
+        doc.fontSize(10)
+            .fillColor('gray')
+            .text('Generated with ❤️ by SahilCodeLab', { align: 'center' });
 
-    // Start Streaming to Response
-    doc.pipe(res);
-
-    let pageNumber = 0;
-
-    // Function: Add Watermark & Footer
-    const addPageDecorations = () => {
-        pageNumber++;
-
-        // 💧 Watermark
-        doc.save();
-        doc.rotate(-45, { origin: [300, 400] });
-        doc.fontSize(50).fillColor('#eeeeee').opacity(0.2);
-        doc.text('SahilCodeLab', 100, 300, {
-            align: 'center',
-            width: 400
-        });
-        doc.restore();
-        doc.opacity(1); // Reset opacity
-
-        // 📄 Page Number Footer
-        doc.fontSize(10).fillColor('gray').text(`Page ${pageNumber}`, 50, 780, {
-            align: 'center',
-            width: 500
-        });
-    };
-
-    // First page decoration
-    doc.on('pageAdded', addPageDecorations);
-    addPageDecorations();
-
-    // ✨ Header
-    doc.font('Helvetica-Bold')
-        .fontSize(20)
-        .fillColor('#222222')
-        .text('📘 Academic Assignment', { align: 'center', underline: true });
-
-    doc.moveDown(1.5);
-
-    // ✅ Handle Empty Content
-    const safeContent = content && content.length > 0 ? content : 'No content provided...';
-
-    // 📝 Main Text Content
-    doc.font('Times-Roman')
-        .fontSize(12)
-        .fillColor('black')
-        .text(safeContent, {
-            align: 'justify',
-            lineGap: 6
-        });
-
-    doc.moveDown(2);
-
-    // ✅ Footer Note
-    doc.fontSize(10)
-        .fillColor('gray')
-        .text('Generated with ❤️ by SahilCodeLab', { align: 'center' });
-
-    doc.end(); // ✅ Finalize the PDF
+        doc.end();
+    } catch (error) {
+        console.error("❌ PDF generation crash inside generatePDF:", error);
+        res.status(500).json({ error: "PDF failed inside generatePDF", details: error.message });
+    }
 }
 // 🚀 Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
