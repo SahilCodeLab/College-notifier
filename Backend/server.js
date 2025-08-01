@@ -3,8 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { OpenAI } = require('openai');
-const PDFDocument = require('pdfkit');
-const rateLimit = require('express-rate-limit');
+const PDFDocument = require('pdfkit'); // 📄 PDF support
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,215 +12,140 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+// ENV Keys
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// Gemini API URL - YAHAN GALTI THEEK KI GAYI HAI
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// OpenRouter Client
+const openai = new OpenAI({
+    apiKey: OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
 });
-app.use(limiter);
 
-// API Key Configuration
-const API_KEYS = {
-  ASSIGNMENT: {
-    key: process.env.ASSIGNMENT_API_KEY || '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',
-    model: 'google/gemini-2.0-flash-exp:free'
-  },
-  LONG_ANSWER: {
-    key: process.env.LONG_ANSWER_API_KEY || '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',
-    model: 'qwen/qwen3-coder:free'
-  },
-  SHORT_ANSWER: {
-    key: process.env.SHORT_ANSWER_API_KEY || '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',
-    model: 'google/gemma-3n-e2b-it:free'
-  },
-  GENERAL: {
-    key: process.env.GENERAL_API_KEY || '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',
-    model: 'zai-ai/glm-4.5-air:free'
-  }
-};
+// ✨ Unified AI Response Generator
+async function generateAIResponse(prompt, context) {
+    const fullPrompt = `${context}\n\n${prompt}`.trim();
 
-// Context Templates
-const CONTEXTS = {
-  ASSIGNMENT: `You are an expert academic content generator. Create detailed, well-structured assignments with clear instructions, appropriate difficulty level, and academic rigor. Include relevant examples and explanations where needed.`,
-  LONG_ANSWER: `Provide a comprehensive 300-500 word explanation with proper structure (introduction, body, conclusion). Use academic tone, cite sources when possible, and ensure logical flow of ideas.`,
-  SHORT_ANSWER: `Give concise 2-3 sentence answers that directly address the question. Be precise and factual without unnecessary elaboration.`,
-  GENERAL: `You are a versatile AI assistant capable of handling quizzes, grammar correction, and general conversation. Provide accurate, helpful responses tailored to the user's request.`
-};
+    // Try OpenRouter First
+    try {
+        const completion = await openai.chat.completions.create({
+            model: 'deepseek/deepseek-r1-0528-qwen3-8b:free',
+            messages: [
+                { role: 'system', content: context },
+                { role: 'user', content: prompt }
+            ],
+            extra_headers: {
+                'HTTP-Referer': 'https://your-frontend.site', // <-- Ise apne site URL se badal lein
+                'X-Title': 'SahilAssignmentAI'
+            }
+        });
 
-// Initialize OpenAI clients for each service
-const clients = {
-  assignment: new OpenAI({
-    apiKey: API_KEYS.ASSIGNMENT.key,
-    baseURL: 'https://openrouter.ai/api/v1'
-  }),
-  longAnswer: new OpenAI({
-    apiKey: API_KEYS.LONG_ANSWER.key,
-    baseURL: 'https://openrouter.ai/api/v1'
-  }),
-  shortAnswer: new OpenAI({
-    apiKey: API_KEYS.SHORT_ANSWER.key,
-    baseURL: 'https://openrouter.ai/api/v1'
-  }),
-  general: new OpenAI({
-    apiKey: API_KEYS.GENERAL.key,
-    baseURL: 'https://openrouter.ai/api/v1'
-  })
-};
+        const result = completion.choices[0].message.content;
+        return { text: result, source: 'openrouter' };
 
-// 🚀 Optimized AI Response Generator
-async function generateAIResponse(prompt, type = 'GENERAL') {
-  const client = clients[type.toLowerCase()] || clients.general;
-  const model = API_KEYS[type]?.model || API_KEYS.GENERAL.model;
-  const context = CONTEXTS[type] || CONTEXTS.GENERAL;
+    } catch (error) {
+        console.warn('⚠️ OpenRouter failed. Trying Gemini...', error.message);
+    }
 
-  try {
-    const completion = await client.chat.completions.create({
-      model: model,
-      messages: [
-        { role: 'system', content: context },
-        { role: 'user', content: prompt }
-      ],
-      temperature: type === 'SHORT_ANSWER' ? 0.3 : 0.7, // Lower temp for short answers
-      max_tokens: type === 'LONG_ANSWER' ? 1000 : type === 'SHORT_ANSWER' ? 100 : 500,
-      extra_headers: {
-        'HTTP-Referer': 'https://sahilcodelab.com',
-        'X-Title': 'SahilAI'
-      }
-    });
+    // Fallback to Gemini
+    try {
+        const response = await axios.post(GEMINI_API_URL, {
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+                temperature: 0.7,
+                topP: 0.95,
+                topK: 40,
+                maxOutputTokens: 2048
+            },
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" }
+            ]
+        });
 
-    return {
-      text: completion.choices[0].message.content,
-      source: model,
-      type: type.toLowerCase()
-    };
-  } catch (error) {
-    console.error(`❌ ${type} API Error:`, error.message);
-    throw new Error(`Failed to generate ${type.toLowerCase()} response`);
-  }
+        const result = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        return { text: result || 'No result from Gemini.', source: 'gemini' };
+
+    } catch (error) {
+        console.error('❌ Gemini API Error:', error.message);
+        throw new Error('Both AI services failed.');
+    }
 }
 
-// 📄 PDF Generator (Optimized)
-function generatePDF(content, res, filename = 'output.pdf') {
-  try {
+// 📄 PDF Generator Function
+function generatePDF(content, res) {
     const doc = new PDFDocument();
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Content-Disposition', 'attachment; filename=output.pdf');
 
-    // Optimized PDF generation
     doc.pipe(res);
-    doc.font('Helvetica').fontSize(12);
-    
-    // Split content into paragraphs for better PDF formatting
-    content.split('\n').forEach(paragraph => {
-      doc.text(paragraph.trim());
-      doc.moveDown();
-    });
-    
-    doc.moveDown().fontSize(10).fillColor('gray')
-       .text('Generated by SahilCodeLab AI', { align: 'center' });
+    doc.font('Times-Roman').fontSize(14);
+    doc.text(content);
+    doc.moveDown();
+    doc.fontSize(10).fillColor('gray').text('\nGenerated by SahilCodeLab', { align: 'center' });
     doc.end();
-  } catch (error) {
-    console.error('PDF Generation Error:', error);
-    res.status(500).json({ error: 'Failed to generate PDF' });
-  }
 }
 
-// 🎯 Endpoints with dedicated AI services
-
-// Assignment Generator
+// 🚀 Assignment Endpoint
 app.post('/generate-assignment', async (req, res) => {
-  try {
-    const { prompt, topic, difficulty } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const enhancedPrompt = `${topic ? `Topic: ${topic}\n` : ''}${
-      difficulty ? `Difficulty: ${difficulty}\n` : ''}${prompt}`;
+        const context = `You are an expert academic content generator...`.trim(); // Context yahan daalein
 
-    const result = await generateAIResponse(enhancedPrompt, 'ASSIGNMENT');
-    
-    if (req.query.download === 'pdf') {
-      return generatePDF(result.text, res, `assignment_${Date.now()}.pdf`);
+        const result = await generateAIResponse(prompt, context);
+        if (req.query.download === 'pdf') return generatePDF(result.text, res);
+        res.json(result);
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 });
 
-// Short Answer Generator (Fast Response)
+// 🧠 Short Answer Endpoint
 app.post('/generate-short-answer', async (req, res) => {
-  try {
-    const { prompt } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    // Set timeout for faster response
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 5000);
+        const context = `Provide a concise 2-3 sentence answer to the question...`;
 
-    const result = await Promise.race([
-      generateAIResponse(prompt, 'SHORT_ANSWER'),
-      timeoutPromise
-    ]);
+        const result = await generateAIResponse(prompt, context);
+        res.json(result);
 
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Long Answer Generator
-app.post('/generate-long-answer', async (req, res) => {
-  try {
-    const { prompt, subtopics } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
-
-    const enhancedPrompt = `${subtopics ? `Subtopics to cover: ${subtopics.join(', ')}\n` : ''}${prompt}`;
-    const result = await generateAIResponse(enhancedPrompt, 'LONG_ANSWER');
-    
-    if (req.query.download === 'pdf') {
-      return generatePDF(result.text, res, `long_answer_${Date.now()}.pdf`);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
 });
 
-// General Purpose AI (Quiz, Grammar, Chat)
-app.post('/general-ai', async (req, res) => {
-  try {
-    const { prompt, taskType } = req.body;
-    if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+// 📚 Long Answer Endpoint
+app.post('/generate-long-answer', async (req, res) => {
+    try {
+        const { prompt } = req.body;
+        if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
-    const result = await generateAIResponse(
-      `${taskType ? `[${taskType.toUpperCase()} TASK]\n` : ''}${prompt}`,
-      'GENERAL'
-    );
-    
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+        const context = `Provide a detailed 300-500 word explanation...`;
+
+        const result = await generateAIResponse(prompt, context);
+        if (req.query.download === 'pdf') return generatePDF(result.text, res);
+        res.json(result);
+
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// 🏥 Health Check
+// 🔍 Health Check
 app.get('/health', (req, res) => {
-  const status = {
-    status: 'healthy',
-    services: Object.keys(API_KEYS).map(key => ({
-      service: key.toLowerCase(),
-      model: API_KEYS[key].model.split('/')[1]
-    })),
-    uptime: process.uptime()
-  };
-  res.status(200).json(status);
+    res.status(200).json({ status: 'healthy', fallback: 'openrouter -> gemini' });
 });
 
 // 🌐 Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log('🔌 AI Services Loaded:');
-  Object.keys(API_KEYS).forEach(key => {
-    console.log(`   ▸ ${key}: ${API_KEYS[key].model}`);
-  });
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🔌 Fallback AI ready: OpenRouter > Gemini`);
 });
